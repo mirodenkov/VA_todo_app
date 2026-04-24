@@ -1,6 +1,6 @@
 const CACHE = 'va-workings-v1';
 const ASSETS = [
-  './Virtual Adepts To-Do.html',
+  './index.html',
   './va-components.jsx',
   './va-manifest.json',
   './va-icon-192.png',

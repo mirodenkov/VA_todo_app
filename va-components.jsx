@@ -140,6 +140,12 @@ function TaskItem({ task, onStatusCycle, onEdit, onDelete, onSubtaskToggle, onSu
         </div>
       )}
 
+      {task.description && (
+        <div className="task-description">
+          {task.description}
+        </div>
+      )}
+
       {expanded && task.subtasks && task.subtasks.length > 0 && (
         <div className="subtasks-list">
           {task.subtasks.map(st => (
@@ -168,6 +174,7 @@ function TaskModal({ task, onSave, onClose, allCategories }) {
     dueTime: '',
     recurring: '',
     subtasks: [],
+    description: '',
     notes: '',
   });
   const [newCat, setNewCat] = React.useState('');
@@ -218,7 +225,18 @@ function TaskModal({ task, onSave, onClose, allCategories }) {
               onChange={e => set('title', e.target.value)}
               placeholder="Describe the working..."
               autoFocus
-              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              onKeyDown={e => e.key === 'Enter' && e.ctrlKey && handleSave()}
+            />
+          </div>
+
+          <div className="field-row">
+            <label>DESCRIPTION</label>
+            <textarea
+              className="va-input va-textarea"
+              value={form.description || ''}
+              onChange={e => set('description', e.target.value)}
+              placeholder="// optional notes, context, or detailed steps..."
+              rows={3}
             />
           </div>
 

@@ -435,7 +435,61 @@ main {
   transition: border-color 0.15s;
 }
 .va-input:focus { border-color: var(--cyan); box-shadow: var(--glow-sm); }
+.sys-menu-wrap { position: relative; }
+.sys-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: var(--bg2);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 20px #00ffcc22;
+  z-index: 150;
+  padding: 4px 0;
+}
+.sys-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 7px 14px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: background 0.1s, color 0.1s;
+}
+.sys-menu-item:hover { background: var(--bg3); color: var(--cyan); }
+.sys-menu-item .hint { color: var(--text-dim); font-size: 10px; margin-left: 6px; }
+.sys-menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.sys-menu-label { font-size: 9px; color: var(--text-dim); padding: 6px 14px 2px; letter-spacing: 0.12em; }
+
 .va-input::placeholder { color: var(--text-dim); }
+
+.va-textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--font);
+  line-height: 1.5;
+}
+
+.task-description {
+  padding-left: 4px;
+  margin-top: 3px;
+  margin-bottom: 2px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 1px dashed var(--border);
+  padding: 4px 0 4px 10px;
+  margin-left: 4px;
+  opacity: 0.85;
+}
+.task-done .task-description { opacity: 0.4; }
 
 .va-select {
   width: 100%;
@@ -476,6 +530,11 @@ main {
 }
 .va-btn.primary:hover { background: var(--cyan); color: var(--bg); }
 .va-btn.cancel:hover { border-color: #ff4444; color: #ff4444; }
+.va-btn.danger {
+  border-color: #ff4444;
+  color: #ff6666;
+}
+.va-btn.danger:hover { background: #ff4444; color: var(--bg); }
 
 .va-btn-sm {
   background: var(--bg3);
@@ -606,7 +665,7 @@ const { useState, useEffect, useRef, useMemo } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "matrixOpacity": 0,
-  "showScanlines": true,
+  "showScanlines": false,
   "compactMode": false,
   "rainSpeed": 0.3
 }/*EDITMODE-END*/;
@@ -677,6 +736,9 @@ function App() {
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null); // null | 'new' | task-object
   const [dark, setDark] = useState(true);
+  const [sysMenuOpen, setSysMenuOpen] = useState(false);
+  const [confirm, setConfirm] = useState(null); // {title, message, onConfirm}
+  const fileInputRef = useRef(null);
   const [tweaksVisible, setTweaksVisible] = useState(false);
   const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
   const dragRef = useRef(null);
@@ -732,6 +794,104 @@ function App() {
   };
 
   const deleteTask = (id) => setTasks(ts => ts.filter(t => t.id !== id));
+
+  // ── Export / Import ──
+  const timestamp = () => {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  };
+
+  const downloadJSON = (data, filename) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  };
+
+  const exportTasks = () => {
+    const payload = {
+      format: 'va-workings-export',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      tasks,
+    };
+    downloadJSON(payload, `va-workings-${timestamp()}.json`);
+    setSysMenuOpen(false);
+  };
+
+  const triggerImport = () => {
+    setSysMenuOpen(false);
+    fileInputRef.current?.click();
+  };
+
+  const applyImport = (importedTasks, mode) => {
+    // Auto-backup current state first
+    const backup = {
+      format: 'va-workings-export',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      tasks,
+    };
+    downloadJSON(backup, `va-workings-backup-${timestamp()}.json`);
+
+    if (mode === 'replace') {
+      setTasks(importedTasks);
+    } else if (mode === 'merge') {
+      setTasks(curr => {
+        const byId = new Map(curr.map(t => [t.id, t]));
+        importedTasks.forEach(t => { if (!byId.has(t.id)) byId.set(t.id, t); });
+        return [...byId.values()];
+      });
+    }
+    setConfirm(null);
+  };
+
+  const handleFileSelected = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const imported = Array.isArray(parsed) ? parsed : parsed.tasks;
+        if (!Array.isArray(imported)) throw new Error('Invalid format');
+        // Basic validation
+        const valid = imported.filter(t => t && typeof t === 'object' && typeof t.title === 'string');
+        if (valid.length === 0) throw new Error('No valid tasks found');
+
+        setConfirm({
+          title: '// IMPORT_WORKINGS',
+          message: `Found ${valid.length} working${valid.length === 1 ? '' : 's'} in backup. A backup of your CURRENT state will be auto-downloaded first. How would you like to import?`,
+          actions: [
+            { label: 'REPLACE_ALL', kind: 'danger', onClick: () => applyImport(valid, 'replace') },
+            { label: 'MERGE', kind: 'primary', onClick: () => applyImport(valid, 'merge') },
+            { label: 'CANCEL', kind: 'cancel', onClick: () => setConfirm(null) },
+          ],
+        });
+      } catch (err) {
+        setConfirm({
+          title: '// IMPORT_FAILED',
+          message: `Could not parse file: ${err.message}`,
+          actions: [{ label: 'DISMISS', kind: 'cancel', onClick: () => setConfirm(null) }],
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!sysMenuOpen) return;
+    const handler = (e) => {
+      if (!e.target.closest('.sys-menu-wrap')) setSysMenuOpen(false);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [sysMenuOpen]);
 
   const toggleSubtask = (taskId, subId) => {
     setTasks(ts => ts.map(t => t.id !== taskId ? t : {
@@ -831,6 +991,34 @@ function App() {
           <button className="hdr-btn" onClick={() => setDark(d => !d)}>
             {dark ? '◑ LIGHT' : '● DARK'}
           </button>
+          <div className="sys-menu-wrap">
+            <button className="hdr-btn" onClick={() => setSysMenuOpen(o => !o)}>
+              // SYSTEM ▾
+            </button>
+            {sysMenuOpen && (
+              <div className="sys-menu">
+                <div className="sys-menu-label">DATA</div>
+                <button className="sys-menu-item" onClick={exportTasks}>
+                  ↓ EXPORT_BACKUP <span className="hint">.json</span>
+                </button>
+                <button className="sys-menu-item" onClick={triggerImport}>
+                  ↑ IMPORT_BACKUP <span className="hint">.json</span>
+                </button>
+                <div className="sys-menu-divider" />
+                <div className="sys-menu-label">INFO</div>
+                <button className="sys-menu-item" style={{ cursor: 'default', color: 'var(--text-dim)' }}>
+                  {tasks.length} working{tasks.length === 1 ? '' : 's'} stored
+                </button>
+              </div>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={handleFileSelected}
+          />
           <button className="hdr-btn primary" onClick={() => setModal('new')}>
             + NEW_WORKING
           </button>
@@ -888,6 +1076,34 @@ function App() {
           onClose={() => setModal(null)}
           allCategories={allCategories}
         />
+      )}
+
+      {/* Confirm Dialog */}
+      {confirm && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setConfirm(null)}>
+          <div className="modal-box" style={{ maxWidth: 460 }}>
+            <div className="modal-header">
+              <GlitchText text={confirm.title} />
+              <button className="modal-close" onClick={() => setConfirm(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text)', fontSize: 12, lineHeight: 1.6, letterSpacing: '0.02em' }}>
+                {confirm.message}
+              </p>
+            </div>
+            <div className="modal-footer">
+              {confirm.actions.map((a, i) => (
+                <button
+                  key={i}
+                  className={`va-btn ${a.kind === 'primary' ? 'primary' : a.kind === 'danger' ? 'danger' : 'cancel'}`}
+                  onClick={a.onClick}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tweaks Panel */}

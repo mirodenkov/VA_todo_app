@@ -2,7 +2,7 @@
   "name": "VA::WORKINGS_LOG",
   "short_name": "Workings",
   "description": "Mercurial Elite task manager — Virtual Adepts",
-  "start_url": "./Virtual Adepts To-Do.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#070b0e",
   "theme_color": "#00ffcc",
