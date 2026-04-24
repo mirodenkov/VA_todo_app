@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VA::WORKINGS_LOG // Mercurial Elite</title>
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Workings" />
+<meta name="theme-color" content="#00ffcc" />
+<link rel="manifest" href="va-manifest.json" />
+<link rel="apple-touch-icon" href="va-icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg:       #070b0e;
+  --bg2:      #0d1419;
+  --bg3:      #111c22;
+  --border:   #1a2d38;
+  --cyan:     #00ffcc;
+  --cyan2:    #00ccff;
+  --violet:   #7b4fff;
+  --dim:      #2a4a5a;
+  --text:     #a8d4c8;
+  --text-dim: #3a6a7a;
+  --done-bg:  #0a1a14;
+  --glow:     0 0 8px #00ffcc55;
+  --glow-sm:  0 0 4px #00ffcc33;
+  --font:     'JetBrains Mono', monospace;
+}
+[data-theme="light"] {
+  --bg:       #f0f4f2;
+  --bg2:      #e2ebe7;
+  --bg3:      #d4e2dc;
+  --border:   #b0ccbf;
+  --text:     #1a3a30;
+  --text-dim: #6a9a8a;
+  --dim:      #8ab4a4;
+  --done-bg:  #dceee6;
+  --glow:     0 0 8px #00cc9944;
+  --glow-sm:  0 0 4px #00cc9922;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-size: 13px;
+}
+
+#root { position: relative; z-index: 1; }
+
+/* ── Layout ── */
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 210px 1fr;
+  grid-template-areas: "header header" "sidebar main";
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  grid-area: header;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+
+.header-sigil {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.header-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cyan);
+  text-shadow: var(--glow);
+  letter-spacing: 0.08em;
+  flex: 1;
+}
+.header-title span { color: var(--text-dim); font-weight: 300; }
+
+.header-actions { display: flex; align-items: center; gap: 8px; }
+
+.hdr-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+}
+.hdr-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: var(--glow-sm); }
+.hdr-btn.primary {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: var(--glow-sm);
+}
+.hdr-btn.primary:hover { background: var(--cyan); color: var(--bg); }
+
+.search-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 4px 10px;
+  width: 200px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-box:focus { border-color: var(--cyan); box-shadow: var(--glow-sm); }
+.search-box::placeholder { color: var(--text-dim); }
+
+/* ── Sidebar ── */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 16px 0;
+  overflow-y: auto;
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+}
+
+.sidebar-section { padding: 0 12px 16px; }
+
+.sidebar-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  margin-bottom: 6px;
+  font-weight: 700;
+  text-shadow: var(--glow-sm);
+}
+.sidebar-label.dim { color: var(--text-dim); margin-top: 8px; text-shadow: none; }
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.filter-btn:hover { color: var(--text); border-color: var(--border); }
+.filter-btn.active { background: var(--bg3); }
+
+.filter-name { flex: 1; }
+.filter-count { font-size: 10px; color: var(--text-dim); }
+.sphere-filter { font-size: 10px; }
+
+.clear-filters-btn {
+  display: block;
+  margin: 0 12px;
+  background: none;
+  border: 1px solid #ff444466;
+  color: #ff6666;
+  font-family: var(--font);
+  font-size: 10px;
+  padding: 4px 8px;
+  cursor: pointer;
+  width: calc(100% - 24px);
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+.clear-filters-btn:hover { background: #ff222222; }
+
+/* ── Main ── */
+main {
+  grid-area: main;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+/* ── Section Header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 8px;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-shadow: var(--glow-sm);
+}
+.section-header:first-child { margin-top: 0; }
+.section-arrow { font-size: 8px; }
+.section-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border), transparent); }
+.section-count { color: var(--text-dim); font-size: 10px; }
+
+/* ── Task Item ── */
+.task-item {
+  border-left: 2px solid var(--border);
+  padding: 5px 0 5px 12px;
+  margin-bottom: 2px;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+.task-item:hover { border-color: var(--dim); background: #ffffff05; }
+.task-item.task-done { border-color: #1a3a2a; opacity: 0.55; }
+.task-item.drag-over { border-color: var(--cyan); background: #00ffcc08; }
+
+.task-main-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.status-badge {
+  background: none;
+  border: 1px solid;
+  font-family: var(--font);
+  font-size: 10px;
+  padding: 1px 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+  transition: all 0.12s;
+}
+.status-badge:hover { filter: brightness(1.3); }
+
+.sphere-col {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+  width: 36px;
+  font-family: var(--font);
+}
+.sphere-none { color: var(--dim); }
+
+.task-arrow { color: var(--dim); flex-shrink: 0; }
+
+.task-title {
+  flex: 1;
+  cursor: pointer;
+  transition: color 0.12s;
+  word-break: break-word;
+  line-height: 1.4;
+}
+.task-title:hover { color: var(--cyan); }
+.task-done .task-title { text-decoration: line-through; color: var(--text-dim); }
+
+.recur-badge {
+  font-size: 9px;
+  color: var(--violet);
+  border: 1px solid var(--violet)55;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  letter-spacing: 0.05em;
+}
+
+.task-spacer { flex: 1; }
+
+.task-due {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.expand-btn:hover { color: var(--cyan); }
+
+.task-del-btn {
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.task-item:hover .task-del-btn { opacity: 1; }
+.task-del-btn:hover { color: #ff4444; }
+
+/* categories row */
+.task-cats-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-left: 4px;
+  margin-top: 2px;
+}
+.cats-indent { color: transparent; font-size: 10px; }
+.cat-tag {
+  font-size: 10px;
+  color: var(--violet);
+  letter-spacing: 0.04em;
+}
+.cat-tag.removable { cursor: pointer; }
+.cat-tag.removable:hover { color: #ff4444; }
+
+/* subtasks */
+.subtasks-list { padding-left: 4px; margin-top: 2px; }
+.subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.subtask-done .subtask-title { text-decoration: line-through; opacity: 0.5; }
+.subtask-prefix { color: var(--dim); flex-shrink: 0; }
+.subtask-check {
+  background: none; border: none;
+  font-family: var(--font); font-size: 11px;
+  color: var(--text-dim); cursor: pointer; flex-shrink: 0;
+  padding: 0;
+}
+.subtask-check:hover { color: var(--cyan); }
+.subtask-done .subtask-check { color: var(--cyan); }
+.subtask-title { flex: 1; }
+.subtask-del {
+  background: none; border: none;
+  color: transparent; font-size: 12px;
+  cursor: pointer; padding: 0 4px;
+  transition: color 0.12s;
+}
+.subtask-row:hover .subtask-del { color: var(--dim); }
+.subtask-del:hover { color: #ff4444 !important; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7,11,14,0.88);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+.modal-box {
+  background: var(--bg2);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 40px #00ffcc22, 0 0 80px #00ffcc0a;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 0.08em;
+}
+.modal-close {
+  background: none; border: none;
+  color: var(--text-dim); font-size: 14px;
+  cursor: pointer; padding: 0 4px;
+}
+.modal-close:hover { color: #ff4444; }
+.modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.field-row { margin-bottom: 14px; }
+.field-row label {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 5px;
+}
+.field-row.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.va-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.va-input:focus { border-color: var(--cyan); box-shadow: var(--glow-sm); }
+.va-input::placeholder { color: var(--text-dim); }
+
+.va-select {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+}
+.va-select:focus { border-color: var(--cyan); }
+
+.tag-input-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.tags-display { display: flex; flex-wrap: wrap; gap: 6px; }
+.subtasks-edit-list { padding-top: 4px; }
+.subtask-edit-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 0; color: var(--text-dim); font-size: 11px;
+}
+
+.va-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 6px 16px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: all 0.15s;
+}
+.va-btn.primary {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: var(--glow-sm);
+}
+.va-btn.primary:hover { background: var(--cyan); color: var(--bg); }
+.va-btn.cancel:hover { border-color: #ff4444; color: #ff4444; }
+
+.va-btn-sm {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 0 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+.va-btn-sm:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── Glitch ── */
+.glitch-text {
+  position: relative;
+  display: inline-block;
+}
+.glitch-text::before, .glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0; top: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.glitch-text:hover::before {
+  opacity: 0.7;
+  color: #ff00aa;
+  clip: rect(0, 900px, 20px, 0);
+  transform: translate(-2px, 0);
+  animation: glitch-a 0.4s steps(1) forwards;
+}
+.glitch-text:hover::after {
+  opacity: 0.7;
+  color: #00ccff;
+  clip: rect(20px, 900px, 40px, 0);
+  transform: translate(2px, 0);
+  animation: glitch-b 0.4s steps(1) forwards;
+}
+@keyframes glitch-a { 0%,100%{opacity:0} 30%,60%{opacity:0.6} 45%{clip:rect(10px,900px,30px,0)} }
+@keyframes glitch-b { 0%,100%{opacity:0} 30%,60%{opacity:0.5} 50%{clip:rect(5px,900px,25px,0)} }
+
+/* ── Empty state ── */
+.empty-state {
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 12px 16px;
+  border-left: 2px solid var(--border);
+  letter-spacing: 0.04em;
+}
+
+/* ── Scanlines overlay ── */
+.scanlines {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
+  );
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 680px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas: "header" "main";
+  }
+  .sidebar { display: none; }
+  main { padding: 12px 14px; }
+  .header-title { font-size: 11px; }
+  .search-box { width: 120px; }
+  .field-row.two-col { grid-template-columns: 1fr; }
+}
+
+/* ── Tweaks Panel ── */
+.tweaks-panel {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  background: var(--bg2);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 20px #00ffcc1a;
+  padding: 14px;
+  z-index: 300;
+  width: 220px;
+  font-size: 11px;
+}
+.tweaks-panel h4 {
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+.tweak-row { margin-bottom: 10px; }
+.tweak-row label { display: block; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 0.06em; font-size: 10px; }
+.tweak-row input[type=range] { width: 100%; accent-color: var(--cyan); }
+.tweak-close {
+  float: right; background: none; border: none;
+  color: var(--text-dim); cursor: pointer; font-size: 13px;
+  margin-top: -4px;
+}
+.tweak-close:hover { color: #ff4444; }
+.tweak-toggle {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; color: var(--text-dim);
+}
+.tweak-toggle input { accent-color: var(--cyan); }
+</style>
+</head>
+<body>
+
+
+<div class="scanlines"></div>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="va-components.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "matrixOpacity": 0,
+  "showScanlines": true,
+  "compactMode": false,
+  "rainSpeed": 0.3
+}/*EDITMODE-END*/;
+
+const SAMPLE_TASKS = [
+  {
+    id: '1', title: 'Map the correspondence nodes of the local network', sphere: 'Correspondence',
+    categories: ['security', 'research'], status: 'proc', dueDate: '2026-04-28', dueTime: '18:00',
+    recurring: null, subtasks: [
+      { id: 's1', title: 'Identify all access points', done: true },
+      { id: 's2', title: 'Document topology', done: false },
+    ], notes: ''
+  },
+  {
+    id: '2', title: 'Study temporal paradox resolution techniques', sphere: 'Time',
+    categories: ['study'], status: 'init', dueDate: '2026-05-01', dueTime: '',
+    recurring: null, subtasks: [], notes: ''
+  },
+  {
+    id: '3', title: 'Encrypt the Chantry\'s communication channels', sphere: 'Forces',
+    categories: ['security'], status: 'hold', dueDate: '', dueTime: '',
+    recurring: null, subtasks: [
+      { id: 's3', title: 'Audit current protocols', done: false },
+    ], notes: ''
+  },
+  {
+    id: '4', title: 'Write morning entropy log', sphere: 'Entropy',
+    categories: ['daily'], status: 'done', dueDate: '', dueTime: '',
+    recurring: 'daily', subtasks: [], notes: ''
+  },
+  {
+    id: '5', title: 'Run pattern recognition on dream journal', sphere: 'Mind',
+    categories: ['daily', 'research'], status: 'proc', dueDate: '', dueTime: '',
+    recurring: 'daily', subtasks: [], notes: ''
+  },
+  {
+    id: '6', title: 'Weekly Chantry sync & status report', sphere: 'Correspondence',
+    categories: ['chantry'], status: 'init', dueDate: '', dueTime: '',
+    recurring: 'weekly', subtasks: [], notes: ''
+  },
+];
+
+// ── Sacred Geometry Sigil ────────────────────────────────────────
+function Sigil() {
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="header-sigil">
+      <circle cx="18" cy="18" r="16" stroke="#00ffcc" strokeWidth="0.5" opacity="0.6"/>
+      <circle cx="18" cy="18" r="10" stroke="#00ffcc" strokeWidth="0.5" opacity="0.4"/>
+      <polygon points="18,4 30,26 6,26" stroke="#00ffcc" strokeWidth="0.6" fill="none" opacity="0.7"/>
+      <polygon points="18,32 6,10 30,10" stroke="#7b4fff" strokeWidth="0.5" fill="none" opacity="0.5"/>
+      <circle cx="18" cy="18" r="2.5" fill="#00ffcc" opacity="0.8"/>
+      <line x1="18" y1="2" x2="18" y2="34" stroke="#00ffcc" strokeWidth="0.3" opacity="0.25"/>
+      <line x1="2" y1="18" x2="34" y2="18" stroke="#00ffcc" strokeWidth="0.3" opacity="0.25"/>
+    </svg>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────
+function App() {
+  const storageKey = 'va-tasks-v1';
+  const initTasks = () => {
+    try { const s = localStorage.getItem(storageKey); return s ? JSON.parse(s) : SAMPLE_TASKS; }
+    catch { return SAMPLE_TASKS; }
+  };
+
+  const [tasks, setTasks] = useState(initTasks);
+  const [filters, setFilters] = useState({ status: null, sphere: null, category: null });
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState(null); // null | 'new' | task-object
+  const [dark, setDark] = useState(true);
+  const [tweaksVisible, setTweaksVisible] = useState(false);
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+  const dragRef = useRef(null);
+  const [dragOver, setDragOver] = useState(null);
+  const rainRef = useRef(null); // kept for compat
+
+  // Persist
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(tasks)); } catch {}
+  }, [tasks]);
+
+  // Theme
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  useEffect(() => {
+    document.querySelector('.scanlines').style.display = tweaks.showScanlines ? '' : 'none';
+  }, [tweaks]);
+
+  // Tweaks panel protocol
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksVisible(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksVisible(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const updateTweak = (k, v) => {
+    const next = { ...tweaks, [k]: v };
+    setTweaks(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: next }, '*');
+  };
+
+  // ── Task helpers ──
+  const statusOrder = ['init', 'proc', 'hold', 'done'];
+  const cycleStatus = (id) => {
+    setTasks(ts => ts.map(t => t.id === id
+      ? { ...t, status: statusOrder[(statusOrder.indexOf(t.status) + 1) % statusOrder.length] }
+      : t
+    ));
+  };
+
+  const saveTask = (task) => {
+    setTasks(ts => {
+      const idx = ts.findIndex(t => t.id === task.id);
+      if (idx >= 0) { const n = [...ts]; n[idx] = task; return n; }
+      return [...ts, task];
+    });
+  };
+
+  const deleteTask = (id) => setTasks(ts => ts.filter(t => t.id !== id));
+
+  const toggleSubtask = (taskId, subId) => {
+    setTasks(ts => ts.map(t => t.id !== taskId ? t : {
+      ...t, subtasks: t.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s)
+    }));
+  };
+
+  const deleteSubtask = (taskId, subId) => {
+    setTasks(ts => ts.map(t => t.id !== taskId ? t : {
+      ...t, subtasks: t.subtasks.filter(s => s.id !== subId)
+    }));
+  };
+
+  // ── Drag & Drop ──
+  const handleDragStart = (id) => { dragRef.current = id; };
+  const handleDragOver = (id) => { setDragOver(id); };
+  const handleDrop = (targetId) => {
+    const fromId = dragRef.current;
+    if (!fromId || fromId === targetId) { setDragOver(null); return; }
+    setTasks(ts => {
+      const arr = [...ts];
+      const fi = arr.findIndex(t => t.id === fromId);
+      const ti = arr.findIndex(t => t.id === targetId);
+      const [item] = arr.splice(fi, 1);
+      arr.splice(ti, 0, item);
+      return arr;
+    });
+    dragRef.current = null;
+    setDragOver(null);
+  };
+
+  // ── Filter & search ──
+  const allCategories = useMemo(() => {
+    const s = new Set();
+    tasks.forEach(t => t.categories?.forEach(c => s.add(c)));
+    return [...s].sort();
+  }, [tasks]);
+
+  const filterTask = (t) => {
+    if (filters.status && t.status !== filters.status) return false;
+    if (filters.sphere && t.sphere !== filters.sphere) return false;
+    if (filters.category && !t.categories?.includes(filters.category)) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return t.title.toLowerCase().includes(q)
+        || t.categories?.some(c => c.includes(q))
+        || t.sphere?.toLowerCase().includes(q);
+    }
+    return true;
+  };
+
+  const recurringDaily  = tasks.filter(t => t.recurring === 'daily'   && filterTask(t));
+  const recurringWeekly = tasks.filter(t => t.recurring === 'weekly'  && filterTask(t));
+  const recurringMonthly= tasks.filter(t => t.recurring === 'monthly' && filterTask(t));
+  const regularTasks    = tasks.filter(t => !t.recurring              && filterTask(t));
+
+  const taskCounts = useMemo(() => {
+    const status = {}, sphere = {}, category = {};
+    tasks.forEach(t => {
+      status[t.status] = (status[t.status] || 0) + 1;
+      if (t.sphere) sphere[t.sphere] = (sphere[t.sphere] || 0) + 1;
+      t.categories?.forEach(c => { category[c] = (category[c] || 0) + 1; });
+    });
+    return { status, sphere, category };
+  }, [tasks]);
+
+  const renderTaskList = (list) => list.map(t => (
+    <TaskItem
+      key={t.id} task={t}
+      onStatusCycle={cycleStatus}
+      onEdit={setModal}
+      onDelete={deleteTask}
+      onSubtaskToggle={toggleSubtask}
+      onSubtaskDelete={deleteSubtask}
+      onDragStart={() => handleDragStart(t.id)}
+      onDragOver={() => handleDragOver(t.id)}
+      onDrop={() => handleDrop(t.id)}
+      isDragOver={dragOver === t.id}
+    />
+  ));
+
+  return (
+    <div className="app-shell">
+      {/* Header */}
+      <header>
+        <Sigil />
+        <div className="header-title">
+          <GlitchText text="VA::WORKINGS_LOG" /> <span>// Mercurial Elite v2.0</span>
+        </div>
+        <div className="header-actions">
+          <input
+            className="search-box"
+            placeholder="/ search workings..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <button className="hdr-btn" onClick={() => setDark(d => !d)}>
+            {dark ? '◑ LIGHT' : '● DARK'}
+          </button>
+          <button className="hdr-btn primary" onClick={() => setModal('new')}>
+            + NEW_WORKING
+          </button>
+        </div>
+      </header>
+
+      {/* Sidebar */}
+      <Sidebar
+        filters={filters}
+        setFilters={setFilters}
+        allCategories={allCategories}
+        taskCounts={taskCounts}
+      />
+
+      {/* Main content */}
+      <main>
+        {/* Recurring: Daily */}
+        {(recurringDaily.length > 0 || !Object.values(filters).some(Boolean)) && (
+          <>
+            <SectionHeader label="RECURRING_DAILY" count={recurringDaily.length} />
+            {recurringDaily.length === 0
+              ? <div className="empty-state">// no daily workings — <span style={{color:'var(--cyan)',cursor:'pointer'}} onClick={() => setModal('new')}>commit one</span></div>
+              : renderTaskList(recurringDaily)}
+          </>
+        )}
+
+        {/* Recurring: Weekly */}
+        {recurringWeekly.length > 0 && (
+          <>
+            <SectionHeader label="RECURRING_WEEKLY" count={recurringWeekly.length} />
+            {renderTaskList(recurringWeekly)}
+          </>
+        )}
+
+        {/* Recurring: Monthly */}
+        {recurringMonthly.length > 0 && (
+          <>
+            <SectionHeader label="RECURRING_MONTHLY" count={recurringMonthly.length} />
+            {renderTaskList(recurringMonthly)}
+          </>
+        )}
+
+        {/* Regular tasks */}
+        <SectionHeader label="WORKINGS" count={regularTasks.length} />
+        {regularTasks.length === 0
+          ? <div className="empty-state">// log empty — <span style={{color:'var(--cyan)',cursor:'pointer'}} onClick={() => setModal('new')}>commit a working</span></div>
+          : renderTaskList(regularTasks)}
+      </main>
+
+      {/* Modal */}
+      {modal && (
+        <TaskModal
+          task={modal === 'new' ? null : modal}
+          onSave={saveTask}
+          onClose={() => setModal(null)}
+          allCategories={allCategories}
+        />
+      )}
+
+      {/* Tweaks Panel */}
+      {tweaksVisible && (
+        <div className="tweaks-panel">
+          <h4>
+            // TWEAKS
+            <button className="tweak-close" onClick={() => {
+              setTweaksVisible(false);
+              window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+            }}>✕</button>
+          </h4>
+          <div className="tweak-row">
+            <label className="tweak-toggle">
+              <input type="checkbox" checked={tweaks.showScanlines}
+                onChange={e => updateTweak('showScanlines', e.target.checked)} />
+              SCANLINE OVERLAY
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./va-sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
